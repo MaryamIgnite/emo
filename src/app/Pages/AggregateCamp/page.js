@@ -40,7 +40,7 @@ export default function AggregateScreen() {
 // Child component that uses search params
 import { useSearchParams } from "next/navigation";
 
-export default function AggregateContent() {
+function AggregateContent() {
     const searchParams = useSearchParams();
     const week = searchParams.get("week");
     const campaignId = searchParams.get("id");
