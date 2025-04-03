@@ -18,6 +18,7 @@ import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import EventIcon from "@mui/icons-material/Event";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation"; // Fixed import order - moved up
 import { useEffect, useState, Suspense } from "react";
 import Timeline from '@mui/lab/Timeline';
 import TimelineItem, { timelineItemClasses } from '@mui/lab/TimelineItem';
@@ -31,15 +32,13 @@ import { BorderRight } from "@mui/icons-material";
 // Main component that doesn't use search params
 export default function AggregateScreen() {
   return (
-    <Suspense fallback={<Box p={4}>Loading campaign information...</Box>}>
+    <Suspense fallback={<Box sx={{ p: 4 }}>Loading campaign information...</Box>}>
       <AggregateContent />
     </Suspense>
   );
 }
 
 // Child component that uses search params
-import { useSearchParams } from "next/navigation";
-
 function AggregateContent() {
     const searchParams = useSearchParams();
     const week = searchParams.get("week");
@@ -83,7 +82,7 @@ function AggregateContent() {
         if (campaignId) {
           const response = await fetch(`/api/Campaigns?id=${campaignId}`);
           const data = await response.json();
-          data.audience = convertaudienceToArray(data.audience);
+          data.audience = convertAudienceToArray(data.audience);
           setCurrentCampaign(data);
         }
       };
@@ -99,272 +98,297 @@ function AggregateContent() {
       }
     }, [week]);
 
-    const convertaudienceToArray = (audience) => {
-      return audience.join(",")
+    // Fixed: Now properly converts string to array if it's a string
+    const convertAudienceToArray = (audience) => {
+      if (Array.isArray(audience)) {
+        return audience;
+      }
+      // If it's a string, split by commas to create an array
+      if (typeof audience === 'string') {
+        return audience.split(',').map(item => item.trim());
+      }
+      // Return empty array as fallback
+      return [];
     }
-      const handleAggregate = async () => {
-        try {
-          setIsLoading(true);
-      
-          const res = await fetch("/api/ProcessLLM", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ campaignId }),
-          });
-      
-          if (!res.ok) {
-            const errData = await res.json();
-            console.error("ProcessLLM failed:", errData);
-            return;
-          }
-      
-          const data = await res.json();
-          console.log("LLM Response:", data);
-      
-          setInsertEvents(data.insertEvents || []);
-          setUpdateEvents(data.updateEvents || []);
-          setUntouchedEvents(data.untouchedEvents || []);
-          setGeneratedEvents([...data.insertEvents, ...data.updateEvents]); // for display only
-      
-          setSuccessMessage(true);
-          setTimeout(() => setSuccessMessage(false), 3000);
-      
-        } catch (err) {
-          console.error("LLM aggregation failed:", err);
-          setErrorMessage(true);
-          setTimeout(() => setErrorMessage(false), 3000);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      const handleSave = async () => {
-        const res = await fetch("/api/Events/BulkSave", {
+
+    const handleAggregate = async () => {
+      try {
+        setIsLoading(true);
+    
+        const res = await fetch("/api/ProcessLLM", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            insert: insertEvents,
-            update: updateEvents
-          })
+          body: JSON.stringify({ campaignId }),
         });
-      
+    
+        if (!res.ok) {
+          const errData = await res.json();
+          console.error("ProcessLLM failed:", errData);
+          return;
+        }
+    
         const data = await res.json();
-        if (data.success) {
-            setInsertEvents([]);
-            setUpdateEvents([]);
-            setGeneratedEvents([]);
-            setSuccessMessage(true);
-            setUntouchedEvents([]);
-            setTimeout(() => setSuccessMessage(false), 3000);
-        }
-        else{
-            setErrorMessage(true);
-            setTimeout(() => setErrorMessage(false), 3000);
-        }
-      };
+        console.log("LLM Response:", data);
+    
+        setInsertEvents(data.insertEvents || []);
+        setUpdateEvents(data.updateEvents || []);
+        setUntouchedEvents(data.untouchedEvents || []);
+        setGeneratedEvents([...data.insertEvents, ...data.updateEvents]); // for display only
+    
+        setSuccessMessage(true);
+        setTimeout(() => setSuccessMessage(false), 3000);
+    
+      } catch (err) {
+        console.error("LLM aggregation failed:", err);
+        setErrorMessage(true);
+        setTimeout(() => setErrorMessage(false), 3000);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    const handleSave = async () => {
+      const res = await fetch("/api/Events/BulkSave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          insert: insertEvents,
+          update: updateEvents
+        })
+      });
+    
+      const data = await res.json();
+      if (data.success) {
+          setInsertEvents([]);
+          setUpdateEvents([]);
+          setGeneratedEvents([]);
+          setSuccessMessage(true);
+          setUntouchedEvents([]);
+          setTimeout(() => setSuccessMessage(false), 3000);
+      }
+      else{
+          setErrorMessage(true);
+          setTimeout(() => setErrorMessage(false), 3000);
+      }
+    };
       
-      
-
   return (
     <Box sx={{ p: 4 }}>
       {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
   {/* Back button on the left */}
-  <Button
-    variant="contained"
-    color="warning"
-    startIcon={<ArrowBackIcon />}
-    onClick={() => handleBack(currentCampaign)}
-    sx={{ml:5}}
-  >
-    Back
-  </Button>
+      <Button
+        variant="contained"
+        color="warning"
+        startIcon={<ArrowBackIcon />}
+        onClick={() => handleBack(currentCampaign)}
+        sx={{ml:5}}
+      >
+        Back
+      </Button>
 
-  {/* Centered Title */}
-  <Typography variant="h5" fontWeight="bold" sx={{ flexGrow: 1, textAlign: "center" }}>
-    Aggregate Campaigns — 
-    <Chip
-      label={`Week ${week}`}
-      variant="outlined"
-      color="primary"
-      size="large"
-      sx={{ ml: 1 }}
-    />
-  </Typography>
+    {/* Centered Title */}
+    <Typography variant="h5" fontWeight="bold" sx={{ flexGrow: 1, textAlign: "center" }}>
+      Aggregate Campaigns — 
+      <Chip
+        label={`Week ${week}`}
+        variant="outlined"
+        color="primary"
+        size="large"
+        sx={{ ml: 1 }}
+      />
+    </Typography>
 
-  {/* Empty box to balance layout */}
-  <Box sx={{ width: 90 }} />
-</Stack>
-      <Divider style={{margin:"auto",maxWidth:"50%",marginBottom:"20px",marginTop:"10px"}}></Divider>
-      {successMessage && (
-        <Alert severity="success" onClose={() => setSuccessMessage(false)}>
-          Success!!
-        </Alert>
-      )}
-      {errorMessage && (
-        <Alert severity="error" onClose={() => setErrorMessage(false)}>
-          Failed!!
-        </Alert>
-      )}
+    {/* Empty box to balance layout */}
+    <Box sx={{ width: 90 }} />
+      </Stack>
+        <Divider style={{margin:"auto",maxWidth:"50%",marginBottom:"20px",marginTop:"10px"}}></Divider>
+        {successMessage && (
+          <Alert severity="success" onClose={() => setSuccessMessage(false)}>
+            Success!!
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert severity="error" onClose={() => setErrorMessage(false)}>
+            Failed!!
+          </Alert>
+        )}
 
-      {/* Main Grid */}
-      <Grid container spacing={3}>
-        {/* Left Column */}
-        <Grid item xs={12} md={6}>
-          {/* Current Submission Card */}
-          <Card elevation={3} sx={{ mb: 3 }}>
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                <Avatar>
-                  <MailOutlineIcon />
-                </Avatar>
-                <Typography variant="h6">Current Submission</Typography>
-              </Stack>
-              <Divider sx={{ mb: 2 }} />
-              <Typography variant="body2">
-                <Box component="span" fontWeight="bold">To:</Box> {currentCampaign.audience}
-              </Typography>
-              <Typography variant="body2"><Box component="span" fontWeight="bold">Subject:</Box> {currentCampaign.subject}</Typography>
-              <Typography variant="body2"><Box component="span" fontWeight="bold">Message:</Box> {currentCampaign.message}</Typography>
-              <Typography variant="body2"><Box component="span" fontWeight="bold">Week:</Box> {currentCampaign.week}</Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="body2" fontWeight="bold">Scheduled Date:</Typography>
-                <Chip label="03-30-2025 (Sunday)" variant="outlined" color="primary" size="small" />
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* This Week's Events Card */}
-          
-              <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                <Avatar sx={{ bgcolor: "secondary.main" }}>
-                  <EventIcon />
-                </Avatar>
-                <Typography variant="h6">This Week's Events</Typography>
-              </Stack>
-              <Divider sx={{ mb: 2 }} />
-
-             {thisWeekEvents.map((e) => (
-                 <Timeline key={e.id} sx={{
-                    [`& .${timelineItemClasses.root}:before`]: {
-                      flex: 0,
-                      padding: 0,
-                    },
-                  }} position="alternate">
-                    <TimelineItem>  
-                    <TimelineSeparator>
-                    <TimelineDot />
-                    <TimelineConnector />
-                    </TimelineSeparator>
-                    <TimelineContent>
-                <Card elevation={5} style={cardStyle}>
-                    <CardContent>
-                    <Box >
-                    <Typography variant="body2"><strong>To:</strong> {e.audience}</Typography>
-                    <Typography variant="body2"><strong>Subject:</strong> {e.event_title}</Typography>
-                    <Typography variant="body2"><strong>Message:</strong> {e.message}</Typography>
-                    <Typography variant="body2"><strong>Week:</strong> {e.week}</Typography>
-                    <Box sx={{ display: "flex", alignItems: "center",mb:1}}>
-                    <Typography variant="body2" fontWeight="bold">Scheduled Date:</Typography>
+        {/* Main Grid - Full-width layout */}
+        <div className= 'flex flex-row w-full' >
+          {/* Left Column */}
+          <div className="w-full md:w-1/2 p-4">
+            {/* Current Submission Card */}
+            <Card elevation={2} sx={{ mb: 3, backgroundColor: "#FFFFFF", width: "100%" }}>
+              <CardContent>
+                <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                  <Avatar sx={{ bgcolor: "#E0E0E0" }}>
+                    <MailOutlineIcon color="action" />
+                  </Avatar>
+                  <Typography variant="h6">Current Submission</Typography>
+                </Stack>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{ pl: 1 }}>
+                  <Typography variant="body1" sx={{ mb: 1 }}>
+                    <Box component="span" fontWeight="bold">To:</Box> {Array.isArray(currentCampaign.audience) ? currentCampaign.audience.join(', ') : currentCampaign.audience}
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 1 }}><Box component="span" fontWeight="bold">Subject:</Box> {currentCampaign.subject}</Typography>
+                  <Typography variant="body1" sx={{ mb: 1 }}><Box component="span" fontWeight="bold">Message:</Box> {currentCampaign.message}</Typography>
+                  <Typography variant="body1" sx={{ mb: 1 }}><Box component="span" fontWeight="bold">Week:</Box> {currentCampaign.week}</Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                    <Typography variant="body1" fontWeight="bold">Scheduled Date:</Typography>
                     <Chip label="03-30-2025 (Sunday)" variant="outlined" color="primary" size="small" sx={{ ml: 1 }} />
-                   </Box>
-                    </Box>
-                    </CardContent>
-                </Card> 
-                </TimelineContent>
-                </TimelineItem>
-                </Timeline>
-                ))}
-              
-         
-        </Grid>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
 
-        {/* Right Column - Aggregated Events */}
-        <Grid item xs={12} md={6}>
-  <Card elevation={3}>
-    <CardContent>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-      <Stack direction="row" alignItems="center" spacing={1}>
-        <Avatar sx={{ bgcolor: "info.main" }}>
-          <AutoAwesomeIcon />
-        </Avatar>
-        <Typography variant="h6">New Events</Typography>
-      </Stack>
-        <Button variant="contained" color="primary" endIcon={<AutoAwesomeIcon />} onClick={() => handleAggregate(campaignId)} >
-          Aggregate Events
-        </Button>
-      </Stack>
-      <Divider sx={{ mb: 2 }} />
+            {/* This Week's Events Card */}
+            <Card elevation={2} sx={{ backgroundColor: "#FFFFFF", width: "100%", minHeight: "400px" }}>
+              <CardContent>
+                <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                  <Avatar sx={{ bgcolor: "#9C27B0" }}>
+                    <EventIcon />
+                  </Avatar>
+                  <Typography variant="h6">This Week's Events</Typography>
+                </Stack>
+                <Divider sx={{ mb: 2 }} />
 
-      {generatedEvents.length === 0 ? (
-        <Typography color="text.secondary">
-          {isLoading ? "Generating events..." : "Click 'Aggregate' to create events."}
-        </Typography>
-      ) : (
-        generatedEvents.map((event, index) => (
-          <Box key={index} sx={{ mb: 3 }}>
-            <TextField
-              fullWidth
-              label="To"
-              value={event.to}
-              onChange={(e) => {
-                const copy = [...generatedEvents];
-                copy[index].to = e.target.value;
-                setGeneratedEvents(copy);
-              }}
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              label="Subject"
-              value={event.subject}
-              onChange={(e) => {
-                const copy = [...generatedEvents];
-                copy[index].subject = e.target.value;
-                setGeneratedEvents(copy);
-              }}
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              multiline
-              label="Message"
-              value={event.message}
-              onChange={(e) => {
-                const copy = [...generatedEvents];
-                copy[index].message = e.target.value;
-                setGeneratedEvents(copy);
-              }}
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              label="Date"
-              value={event.week}
-              onChange={(e) => {
-                const copy = [...generatedEvents];
-                copy[index].week = e.target.value;
-                setGeneratedEvents(copy);
-              }}
-              sx={{ mb: 1 }}
-            />
-            <Divider sx={{ mt: 2 }} />
-          </Box>
-        ))
-      )}
+                {/* Fix for empty thisWeekEvents array */}
+                {thisWeekEvents.length === 0 ? (
+                  <Typography color="text.secondary" sx={{ p: 2 }}>
+                    No events scheduled for this week.
+                  </Typography>
+                ) : (
+                  thisWeekEvents.map((e) => (
+                    <Timeline key={e.id} sx={{
+                        [`& .${timelineItemClasses.root}:before`]: {
+                          flex: 0,
+                          padding: 0,
+                        },
+                      }} position="alternate">
+                        <TimelineItem>  
+                        <TimelineSeparator>
+                        <TimelineDot />
+                        <TimelineConnector />
+                        </TimelineSeparator>
+                        <TimelineContent>
+                    <Card elevation={5} style={cardStyle}>
+                        <CardContent>
+                        <Box>
+                        <Typography variant="body2"><strong>To:</strong> {e.audience}</Typography>
+                        <Typography variant="body2"><strong>Subject:</strong> {e.event_title}</Typography>
+                        <Typography variant="body2"><strong>Message:</strong> {e.message}</Typography>
+                        <Typography variant="body2"><strong>Week:</strong> {e.week}</Typography>
+                        <Box sx={{ display: "flex", alignItems: "center",mb:1}}>
+                        <Typography variant="body2" fontWeight="bold">Scheduled Date:</Typography>
+                        <Chip label="03-30-2025 (Sunday)" variant="outlined" color="primary" size="small" sx={{ ml: 1 }} />
+                      </Box>
+                        </Box>
+                        </CardContent>
+                    </Card> 
+                    </TimelineContent>
+                    </TimelineItem>
+                    </Timeline>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-      {generatedEvents.length > 0 && (
-        <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end" }}>
-          <Button variant="contained" color="success" endIcon={<SaveOutlinedIcon />} onClick={() => handleSave()}>
-          Save Events
-        </Button>
-        </Box>
-      )}
-    </CardContent>
-  </Card>
-</Grid>
+          {/* Right Column - Aggregated Events */}
+          <div className="w-full md:w-1/2 p-4">
+            <Card elevation={2} sx={{ backgroundColor: "#FFFFFF", width: "100%", minHeight: "calc(100% - 16px)" }}>
+              <CardContent>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Avatar sx={{ bgcolor: "#2196F3" }}>
+                    <AutoAwesomeIcon />
+                  </Avatar>
+                  <Typography variant="h6">New Events</Typography>
+                </Stack>
+                  <Button 
+                    variant="contained" 
+                    color="primary" 
+                    endIcon={<AutoAwesomeIcon />} 
+                    onClick={() => handleAggregate(campaignId)}
+                    sx={{ bgcolor: "#2196F3", '&:hover': { bgcolor: "#1976D2" } }}
+                  >
+                    AGGREGATE EVENTS
+                  </Button>
+                </Stack>
+                <Divider sx={{ mb: 2 }} />
 
-      </Grid>
+                <Box sx={{ minHeight: "300px", display: "flex", alignItems: generatedEvents.length === 0 ? "center" : "flex-start", justifyContent: generatedEvents.length === 0 ? "center" : "flex-start", flexDirection: "column", width: "100%" }}>
+                  {generatedEvents.length === 0 ? (
+                    <Typography color="text.secondary" sx={{ textAlign: "center", width: "100%" }}>
+                      {isLoading ? "Generating events..." : "Click 'Aggregate' to create events."}
+                    </Typography>
+                  ) : (
+                    generatedEvents.map((event, index) => (
+                      <Box key={index} sx={{ mb: 3, width: "100%" }}>
+                        <TextField
+                          fullWidth
+                          label="To"
+                          value={event.to}
+                          onChange={(e) => {
+                            const copy = [...generatedEvents];
+                            copy[index].to = e.target.value;
+                            setGeneratedEvents(copy);
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <TextField
+                          fullWidth
+                          label="Subject"
+                          value={event.subject}
+                          onChange={(e) => {
+                            const copy = [...generatedEvents];
+                            copy[index].subject = e.target.value;
+                            setGeneratedEvents(copy);
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <TextField
+                          fullWidth
+                          multiline
+                          label="Message"
+                          value={event.message}
+                          onChange={(e) => {
+                            const copy = [...generatedEvents];
+                            copy[index].message = e.target.value;
+                            setGeneratedEvents(copy);
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <TextField
+                          fullWidth
+                          label="Date"
+                          value={event.week}
+                          onChange={(e) => {
+                            const copy = [...generatedEvents];
+                            copy[index].week = e.target.value;
+                            setGeneratedEvents(copy);
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Divider sx={{ mt: 2 }} />
+                      </Box>
+                    ))
+                  )}
+                </Box>
+
+                {generatedEvents.length > 0 && (
+                  <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end" }}>
+                    <Button variant="contained" color="success" endIcon={<SaveOutlinedIcon />} onClick={() => handleSave()}>
+                    Save Events
+                  </Button>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       
     </Box>
   );
