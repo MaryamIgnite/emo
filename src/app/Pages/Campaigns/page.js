@@ -1,15 +1,14 @@
 "use client";
 
-import React,{ useState, useEffect } from "react";
-import { Box,FormControl,InputLabel,Container, TextField, Button, Typography, Select, MenuItem, Divider,FormGroup,FormControlLabel,Checkbox,Alert } from "@mui/material";
+import React, { useState, useEffect, Suspense } from "react";
+import { Box, FormControl, InputLabel, Container, TextField, Button, Typography, Select, MenuItem, Divider, FormGroup, FormControlLabel, Checkbox, Alert } from "@mui/material";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ListSubheader } from "@mui/material";
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import CampaignIcon from '@mui/icons-material/Campaign';
 
-
-
-export default function Campaigns() {
+// Separate component for handling search params
+function CampaignsContent() {
   const getDateOfISOWeek = (week, year) => {
     const simple = new Date(year, 0, 1 + (week - 1) * 7);
     const dow = simple.getDay();
@@ -33,14 +32,12 @@ export default function Campaigns() {
   
   const weekOptions = Array.from({ length: 27 }, (_, i) => currentWeekNumber + i);
   
-  
-  
   const [emailTypes, setEmailTypes] = useState([]);  
   const [successMessage, setSuccessMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const campaignId = searchParams.get("id"); // ✅ Get campaign ID from URL
+  const campaignId = searchParams.get("id");
   const [campaign, setCampaign] = useState({
     audience: "",
     subject: "",
@@ -58,6 +55,7 @@ export default function Campaigns() {
       year: "numeric",
     })
   );
+
   useEffect(() => {
     async function fetchEmailTypes() {
       const response = await fetch("/api/EmailTypes");
@@ -70,18 +68,18 @@ export default function Campaigns() {
   useEffect(() => {
     if (campaignId) {
       async function fetchCampaign() {
-        const response = await fetch(`/api/Campaigns?id=${campaignId}`); // ✅ Send ID as query param
+        const response = await fetch(`/api/Campaigns?id=${campaignId}`);
         const data = await response.json();
         if (data) {
           setCampaign({
             ...data,
-            //audience: data.audience.split(","), // Convert string to array
           });
         }
       }
       fetchCampaign();
     }
   }, [campaignId]);
+
   useEffect(() => {
     setCampaign(prev => ({ ...prev, week: getWeekNumber() }));
   }, []);
@@ -105,12 +103,12 @@ export default function Campaigns() {
     e.preventDefault();
     if (!campaign.audience || !campaign.subject || !campaign.message || !campaign.week || !campaign.email_type) {
       setErrorMessage("All required fields must be filled.");
-      setTimeout(() => setErrorMessage("Please fill out required fields."), 3000); // Hide after 3 sec
+      setTimeout(() => setErrorMessage("Please fill out required fields."), 3000);
       return;
     }
     const campaignWithDefaults = {
       ...campaign,
-      audience: campaign.audience.join(","), // ✅ Convert array to string before sending
+      audience: campaign.audience.join(","),
     };
     try {
       const response = await fetch(campaignId ? `/api/Campaigns` : "/api/Campaigns", {
@@ -121,16 +119,6 @@ export default function Campaigns() {
 
       const data = await response.json();
       console.log("Server Response:", data);
-      /* setCampaign({
-        audience: "",
-        subject: "",
-        message: "",
-        need: "",
-        week: "",
-        frequency: "0000000",
-        call_to_action: "",
-        email_type: "",
-      }); */
 
       setSuccessMessage(true);
       setTimeout(() => setSuccessMessage(false), 3000);
@@ -143,6 +131,7 @@ export default function Campaigns() {
       console.error("Error submitting campaign:", error);
     }
   };
+
   const weekGroups = weekOptions.reduce((groups, week) => {
     const start = getDateOfISOWeek(week, currentYear);
     const end = new Date(start);
@@ -162,7 +151,6 @@ export default function Campaigns() {
   
 
   return (
-    
     <Container maxWidth="md" className="my-5 p-5" style={{backgroundColor:"#ffff",borderRadius:"10px",color:"black",boxShadow:"0 14px 16px rgba(0, 0, 0, 0.1)"}}>
        {successMessage && (
         <Alert severity="success" onClose={() => setSuccessMessage(false)}>
@@ -183,7 +171,7 @@ export default function Campaigns() {
         value={Array.isArray(campaign.audience) ? campaign.audience.join(", ") : ""} onChange={handleChange} margin="normal" 
         InputLabelProps={{ shrink: true }} placeholder="e.g. GFI Kerio Connect Distributors" required/>
 
-<TextField fullWidth label="Subject" name="subject" 
+        <TextField fullWidth label="Subject" name="subject" 
         value={campaign.subject} onChange={handleChange} margin="normal" 
         InputLabelProps={{ shrink: true }} placeholder="e.g. Our Latest Offers" required/> 
 
@@ -195,67 +183,61 @@ export default function Campaigns() {
         value={campaign.need} onChange={handleChange} margin="normal" 
         InputLabelProps={{ shrink: true }} placeholder="Why is this important to Customer?"/>
         
+        <Box sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          flexWrap: "nowrap",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+        }}>
+          <FormControl margin="normal" fullWidth>
+            <InputLabel>Week Number</InputLabel>
+            <Select
+              label="Week Number"
+              value={campaign.week}
+              onChange={(e) => {
+                const selectedWeek = parseInt(e.target.value);
+                const date = getDateOfISOWeek(selectedWeek, currentYear);
+                const formatted = date.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
 
-<Box sx={{
-    display: "flex",
-    alignItems: "center",
-    gap: 2,
-    flexWrap: "nowrap",          // ⛔ prevents line wrap
-    whiteSpace: "nowrap",        // ⛔ prevents wrapping text
-    overflow: "hidden",          // ⛔ hides overflow
-  }}>
-  <FormControl margin="normal" fullWidth>
-    <InputLabel>Week Number</InputLabel>
-    <Select
-  
-  label="Week Number"
-  value={campaign.week}
-  onChange={(e) => {
-    const selectedWeek = parseInt(e.target.value);
-    const date = getDateOfISOWeek(selectedWeek, currentYear);
-    const formatted = date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+                setCampaign({ ...campaign, week: selectedWeek.toString() });
+                setWeekDate(formatted);
+              }}
+            >
+              {Object.entries(weekGroups).flatMap(([month, weeks]) => [
+                <ListSubheader key={month}>{month}</ListSubheader>,
+                ...weeks.map(({ week, label }) => (
+                  <MenuItem
+                    key={week}
+                    value={week}
+                    sx={{
+                      fontWeight: week === currentWeekNumber ? "bold" : "normal",
+                      backgroundColor: week === currentWeekNumber ? "#e3f2fd" : "inherit",
+                    }}
+                  >
+                    <CalendarMonthIcon
+                      fontSize="small"
+                      sx={{ mr: 1, color: week === currentWeekNumber ? "primary.main" : "text.secondary" }}
+                    />
+                    {label}
+                  </MenuItem>
+                ))
+              ])}
+            </Select>
+          </FormControl>
 
-    setCampaign({ ...campaign, week: selectedWeek.toString() });
-    setWeekDate(formatted);
-  }}
->
-  {Object.entries(weekGroups).flatMap(([month, weeks]) => [
-    <ListSubheader key={month}>{month}</ListSubheader>,
-    ...weeks.map(({ week, label }) => (
-      <MenuItem
-  key={week}
-  value={week}
-  sx={{
-    fontWeight: week === currentWeekNumber ? "bold" : "normal",
-    backgroundColor: week === currentWeekNumber ? "#e3f2fd" : "inherit",
-  }}
->
-  <CalendarMonthIcon
-    fontSize="small"
-    sx={{ mr: 1, color: week === currentWeekNumber ? "primary.main" : "text.secondary" }}
-  />
-  {label}
-</MenuItem>
+          <Typography variant="body2" color="text.secondary">
+            {weekDate}
+          </Typography>
+        </Box>
 
-    ))
-  ])}
-</Select>
-
-
-  </FormControl>
-
-  <Typography variant="body2" color="text.secondary">
-    {weekDate}
-  </Typography>
-</Box>
-
-
-<InputLabel>Days Allowed (Mon - Sun)</InputLabel> 
-    <FormGroup row required>
+        <InputLabel>Days Allowed (Mon - Sun)</InputLabel> 
+        <FormGroup row required>
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
             <FormControlLabel
               key={day}
@@ -274,23 +256,30 @@ export default function Campaigns() {
         value={campaign.call_to_action} onChange={handleChange} margin="normal" 
         InputLabelProps={{ shrink: true }} placeholder="e.g. Sign Up Now"/>
 
-        {/*<span className="label" required>Email Type*</span>*/}
         <FormControl margin="normal" fullWidth>
-        <InputLabel>Email Type</InputLabel>
-        <Select name="email_type" value={campaign.email_type} onChange={handleChange} margin="normal" required>
-          {emailTypes.map((type) => (
-            <MenuItem key={type.id} value={type.type_name}>
-              {type.type_name}
-            </MenuItem>
-          ))}
-        </Select>
+          <InputLabel>Email Type</InputLabel>
+          <Select name="email_type" value={campaign.email_type} onChange={handleChange} margin="normal" required>
+            {emailTypes.map((type) => (
+              <MenuItem key={type.id} value={type.type_name}>
+                {type.type_name}
+              </MenuItem>
+            ))}
+          </Select>
         </FormControl>
 
         <Button style={{marginTop:"10px"}} type="submit" variant="contained" color="primary" fullWidth>
-        {campaignId ? "Update Campaign" : "Next"}
-        
+          {campaignId ? "Update Campaign" : "Next"}
         </Button>
       </form>
     </Container>
+  );
+}
+
+// Wrapper component to handle Suspense
+export default function Campaigns() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CampaignsContent />
+    </Suspense>
   );
 }
