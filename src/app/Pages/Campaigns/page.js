@@ -58,9 +58,20 @@ function CampaignsContent() {
 
   useEffect(() => {
     async function fetchEmailTypes() {
-      const response = await fetch("/api/EmailTypes");
-      const data = await response.json();
-      setEmailTypes(data);
+      try {
+        const response = await fetch("/api/EmailTypes");
+        const data = await response.json();
+  
+        if (Array.isArray(data)) {
+          setEmailTypes(data);
+        } else {
+          console.error("Invalid emailTypes format:", data);
+          setEmailTypes([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch emailTypes", err);
+        setEmailTypes([]);
+      }
     }
     fetchEmailTypes();
   }, []);
