@@ -10,15 +10,15 @@ import {
   Avatar,
   Chip,
   Stack,
-  TextField,Alert
+  TextField, Alert
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import EventIcon from "@mui/icons-material/Event";
-import { useSearchParams,useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import Timeline from '@mui/lab/Timeline';
 import TimelineItem, { timelineItemClasses } from '@mui/lab/TimelineItem';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
@@ -27,14 +27,27 @@ import TimelineContent from '@mui/lab/TimelineContent';
 import TimelineDot from '@mui/lab/TimelineDot';
 import { BorderRight } from "@mui/icons-material";
 
+
+// Main component that doesn't use search params
 export default function AggregateScreen() {
+  return (
+    <Suspense fallback={<Box p={4}>Loading campaign information...</Box>}>
+      <AggregateContent />
+    </Suspense>
+  );
+}
+
+// Child component that uses search params
+import { useSearchParams } from "next/navigation";
+
+export default function AggregateContent() {
     const searchParams = useSearchParams();
     const week = searchParams.get("week");
     const campaignId = searchParams.get("id");
 
     const [successMessage, setSuccessMessage] = useState(false);
     const [errorMessage, setErrorMessage] = useState(false);
-  
+    
     const [currentCampaign, setCurrentCampaign] = useState([]);
     const [campaigns, setCampaigns] = useState([]);
     const [thisWeekEvents, setThisWeekEvents] = useState([]);
@@ -47,37 +60,36 @@ export default function AggregateScreen() {
     const [untouchedEvents, setUntouchedEvents] = useState([]);
 
     const cardStyle = {
-       borderRadius: "8px",
-      };
+      borderRadius: "8px",
+    };
   
     // 1. Fetch campaign by ID
     const handleBack = (currentCampaign) => {
-        router.push(`/Pages/Edit?id=${currentCampaign.id}`);
-      };
+      router.push(`/Pages/Edit?id=${currentCampaign.id}`);
+    };
 
-      const fetchCampaigns = async () => {
-        const response = await fetch("/api/Campaigns");
-        const data = await response.json();
-        setCampaigns(data);
-      };
-      
-      useEffect(() => {
-        fetchCampaigns();
-      }, []);
-      
-      
+    const fetchCampaigns = async () => {
+      const response = await fetch("/api/Campaigns");
+      const data = await response.json();
+      setCampaigns(data);
+    };
+
     useEffect(() => {
-        const fetchCampaignId = async () => {
-            if (campaignId) {
-            const response = await fetch(`/api/Campaigns?id=${campaignId}`);
-            const data = await response.json();
-            data.audience = convertaudienceToArray(data.audience);
-            setCurrentCampaign(data);
-            }
-          };
-          fetchCampaignId();
+      fetchCampaigns();
     }, []);
-  
+
+    useEffect(() => {
+      const fetchCampaignId = async () => {
+        if (campaignId) {
+          const response = await fetch(`/api/Campaigns?id=${campaignId}`);
+          const data = await response.json();
+          data.audience = convertaudienceToArray(data.audience);
+          setCurrentCampaign(data);
+        }
+      };
+      fetchCampaignId();
+    }, [campaignId]);
+
     // 2. Fetch events by week
     useEffect(() => {
       if (week) {
@@ -87,11 +99,9 @@ export default function AggregateScreen() {
       }
     }, [week]);
 
-    const convertaudienceToArray=(audience)=>{
-        return audience
-        .join(",")
-      }
-
+    const convertaudienceToArray = (audience) => {
+      return audience.join(",")
+    }
       const handleAggregate = async () => {
         try {
           setIsLoading(true);
