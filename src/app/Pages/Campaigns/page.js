@@ -72,9 +72,13 @@ function CampaignsContent() {
         console.error("Failed to fetch emailTypes", err);
         setEmailTypes([]);
       }
+      console.log("Fetched emailTypes:", data);
+
     }
     fetchEmailTypes();
   }, []);
+
+  
 
   useEffect(() => {
     if (campaignId) {
